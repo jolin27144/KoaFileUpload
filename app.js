@@ -1,74 +1,72 @@
 const Koa = require('koa');
-const app = new Koa();
 const Router = require('koa-router');
-const multer = require('koa-multer');
 const serve = require('koa-static');
+const multer = require('koa-multer'); // 处理上传中间件
 const path = require('path');
 const fs = require('fs-extra');
 const koaBody = require('koa-body');
-const { mkdirsSync } = require('./utils/dir');
 const uploadPath = path.join(__dirname, 'upload');
 const uploadTempPath = path.join(uploadPath, 'temp');
 const upload = multer({ dest: uploadTempPath });
+
 const router = new Router();
+const app = new Koa();
+
 app.use(koaBody());
+
 /**
  * single(fieldname)
  * Accept a single file with the name fieldname. The single file will be stored in req.file.
  */
 router.post('/file/upload', upload.single('file'), async (ctx, next) => {
-  console.log('file upload...')
+  const { index, hash } = ctx.req.body;
+  console.log(`File Comes In With Index:${index}`);
   // 根据文件hash创建文件夹，把默认上传的文件移动当前hash文件夹下。方便后续文件合并。
-  const {
-    name,
-    total,
-    index,
-    size,
-    hash
-  } = ctx.req.body;
 
   const chunksPath = path.join(uploadPath, hash, '/');
-  if(!fs.existsSync(chunksPath)) mkdirsSync(chunksPath);
+  if (!fs.existsSync(chunksPath)) {
+    // 创建hash目录
+    await fs.mkdir(chunksPath, { recursive: true });
+  }
+  // 分片移动到hash目录
   fs.renameSync(ctx.req.file.path, chunksPath + hash + '-' + index);
+
   ctx.status = 200;
-  ctx.res.end('Success');
-})
+  ctx.res.end();
+  console.log(`File With Index:${index} Saved`);
+});
 
 router.post('/file/merge_chunks', async (ctx, next) => {
-  const {    
-    size, 
-    name, 
-    total, 
-    hash
-  } = ctx.request.body;
-  // 根据hash值，获取分片文件。
-  // 创建存储文件
-  // 合并
+  const { name, total, hash } = ctx.request.body;
+
+  // 根据hash值，获取分片存储的hash目录
   const chunksPath = path.join(uploadPath, hash, '/');
+  // 确定合并之后要存储的路径
   const filePath = path.join(uploadPath, name);
   // 读取所有的chunks 文件名存放在数组中
   const chunks = fs.readdirSync(chunksPath);
   // 创建存储文件
-  fs.writeFileSync(filePath, ''); 
-  if(chunks.length !== total || chunks.length === 0) {
+  fs.writeFileSync(filePath, '');
+  if (chunks.length !== total || chunks.length === 0) {
     ctx.status = 200;
     ctx.res.end('切片文件数量不符合');
     return;
   }
-  for (let i = 0; i < total; i++) {
+  chunks.forEach((chunk) => {
     // 追加写入到文件中
-    fs.appendFileSync(filePath, fs.readFileSync(chunksPath + hash + '-' +i));
-    // 删除本次使用的chunk    
-    fs.unlinkSync(chunksPath + hash + '-' +i);
-  }
+    fs.appendFileSync(filePath, fs.readFileSync(path.join(chunksPath, chunk)));
+    // 删除本次使用的chunk
+    fs.unlinkSync(path.join(chunksPath, chunk));
+  });
   fs.rmdirSync(chunksPath);
-  // 文件合并成功，可以把文件信息进行入库。
+  // 文件合并成功
   ctx.status = 200;
   ctx.res.end('合并成功');
-})
+});
+
 app.use(router.routes());
 app.use(router.allowedMethods());
-app.use(serve(__dirname + '/public'));
+app.use(serve(__dirname + '/public')); // 静态文件服务
 app.listen(9000, () => {
-  console.log('服务9000端口已经启动了');
+  console.log('listening port:9000');
 });
