@@ -3,6 +3,7 @@
 
   // 使用Blob.slice方法来对文件进行分割。
   // 同时该方法在不同的浏览器使用方式不同。
+  // 使用供应商前缀兼容https://developer.mozilla.org/en-US/docs/Web/API/Blob/slice
   const blobSlice =
     File.prototype.slice ||
     File.prototype.mozSlice ||
@@ -52,7 +53,6 @@
   }
 
   async function submitBtnClick() {
-    // const fileDom = $('#file')[0];
     const fileDom = document.querySelector('#file');
     // 获取到的files为一个File对象数组，如果允许多选的时候，文件为多个
     const files = fileDom.files;
