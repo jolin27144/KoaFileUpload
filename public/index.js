@@ -52,7 +52,6 @@
   }
 
   async function submitBtnClick() {
-    debugger;
     // const fileDom = $('#file')[0];
     const fileDom = document.querySelector('#file');
     // 获取到的files为一个File对象数组，如果允许多选的时候，文件为多个
