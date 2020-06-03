@@ -22,11 +22,11 @@
 
       fileReader.onload = (e) => {
         spark.append(e.target.result); // Append array buffer
-        const result = spark.end();
-        const sparkMd5 = new SparkMD5();
-        sparkMd5.append(result);
-        const hexHash = sparkMd5.end();
-        resolve(hexHash);
+        // const result = spark.end();
+        // const sparkMd5 = new SparkMD5();
+        // sparkMd5.append(result);
+        // const hexHash = sparkMd5.end();
+        resolve(spark.end());
       };
       fileReader.onerror = () => {
         reject('文件读取失败！');
