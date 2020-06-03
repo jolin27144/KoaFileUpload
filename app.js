@@ -4,6 +4,7 @@ const serve = require('koa-static');
 const multer = require('koa-multer'); // 处理上传中间件
 const path = require('path');
 const fs = require('fs-extra');
+const crypto = require('crypto');
 const koaBody = require('koa-body');
 const uploadPath = path.join(__dirname, 'upload');
 const uploadTempPath = path.join(uploadPath, 'temp');
@@ -19,17 +20,26 @@ app.use(koaBody());
  * Accept a single file with the name fieldname. The single file will be stored in req.file.
  */
 router.post('/file/upload', upload.single('file'), async (ctx, next) => {
-  const { index, hash } = ctx.req.body;
+  const { index, fileHash, chunkHash } = ctx.req.body;
   console.log(`File Comes In With Index:${index}`);
   // 根据文件hash创建文件夹，把默认上传的文件移动当前hash文件夹下。方便后续文件合并。
 
-  const chunksPath = path.join(uploadPath, hash, '/');
+  const chunksPath = path.join(uploadPath, fileHash, '/');
   if (!fs.existsSync(chunksPath)) {
     // 创建hash目录
     await fs.mkdir(chunksPath, { recursive: true });
   }
+  const buffer = fs.readFileSync(ctx.req.file.path);
+  const fsHash = crypto.createHash('md5');
+
+  fsHash.update(buffer);
+  const md5 = fsHash.digest('hex');
+  if (md5 !== chunkHash) {
+    console.log('分片校验失败');
+  }
+
   // 分片移动到hash目录
-  fs.renameSync(ctx.req.file.path, chunksPath + hash + '-' + index);
+  fs.renameSync(ctx.req.file.path, chunksPath + chunkHash + '-' + index);
 
   ctx.status = 200;
   ctx.res.end();
@@ -37,10 +47,10 @@ router.post('/file/upload', upload.single('file'), async (ctx, next) => {
 });
 
 router.post('/file/merge_chunks', async (ctx, next) => {
-  const { name, total, hash } = ctx.request.body;
+  const { name, total, fileHash } = ctx.request.body;
 
   // 根据hash值，获取分片存储的hash目录
-  const chunksPath = path.join(uploadPath, hash, '/');
+  const chunksPath = path.join(uploadPath, fileHash, '/');
   // 确定合并之后要存储的路径
   const filePath = path.join(uploadPath, name);
   // 读取所有的chunks 文件名存放在数组中

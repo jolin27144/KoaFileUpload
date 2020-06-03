@@ -10,40 +10,27 @@
     File.prototype.webkitSlice;
 
   function hashFile(file) {
+    if (!file) throw Error('参数不正确');
+
+    // // 超过文件字节则设为最后一个字节
+    // const end = Math.min(file.size, start + step);
+
     return new Promise((resolve, reject) => {
-      const chunks = Math.ceil(file.size / chunkSize);
-      let currentChunk = 0;
       const spark = new SparkMD5.ArrayBuffer();
       const fileReader = new FileReader();
-      function loadNext() {
-        const start = currentChunk * chunkSize;
-        const end =
-          start + chunkSize >= file.size ? file.size : start + chunkSize;
-        fileReader.readAsArrayBuffer(blobSlice.call(file, start, end));
-      }
+      fileReader.readAsArrayBuffer(file);
+
       fileReader.onload = (e) => {
         spark.append(e.target.result); // Append array buffer
-        currentChunk += 1;
-        if (currentChunk < chunks) {
-          loadNext();
-        } else {
-          console.log('finished loading');
-          const result = spark.end();
-          // 如果单纯的使用result 作为hash值的时候, 如果文件内容相同，而名称不同的时候
-          // 想保留两个文件无法保留。所以把文件名称加上。
-          const sparkMd5 = new SparkMD5();
-          sparkMd5.append(result);
-          sparkMd5.append(file.name);
-          const hexHash = sparkMd5.end();
-          resolve(hexHash);
-        }
+        const result = spark.end();
+        const sparkMd5 = new SparkMD5();
+        sparkMd5.append(result);
+        const hexHash = sparkMd5.end();
+        resolve(hexHash);
       };
       fileReader.onerror = () => {
-        console.warn('文件读取失败！');
+        reject('文件读取失败！');
       };
-      loadNext();
-    }).catch((err) => {
-      console.log(err);
     });
   }
 
@@ -62,28 +49,30 @@
       return;
     }
 
-    const blockCount = Math.ceil(file.size / chunkSize); // 分片总数
+    const chunkCount = Math.ceil(file.size / chunkSize); // 分片总数
     const axiosPromiseArray = []; // axiosPromise数组
-    const hash = await hashFile(file); //文件 hash
-    // 获取文件hash之后，如果需要做断点续传，可以根据hash值去后台进行校验。
-    // 看看是否已经上传过该文件，并且是否已经传送完成以及已经上传的切片。
+    const fileHash = await hashFile(file); //文件 hash值
 
-    for (let i = 0; i < blockCount; i++) {
+    for (let i = 0; i < chunkCount; i++) {
       const start = i * chunkSize;
       const end = Math.min(file.size, start + chunkSize);
+      const chunk = blobSlice.call(file, start, end);
+      const chunkHash = await hashFile(chunk, start, end);
+
       // 构建表单
       const form = new FormData();
-      form.append('file', blobSlice.call(file, start, end));
+      form.append('file', chunk);
       form.append('name', file.name);
-      form.append('total', blockCount);
+      form.append('total', chunkCount);
       form.append('index', i);
       form.append('size', file.size);
-      form.append('hash', hash);
+      form.append('fileHash', fileHash);
+      form.append('chunkHash', chunkHash);
       // ajax提交 分片，此时 content-type 为 multipart/form-data
       const axiosOptions = {
         onUploadProgress: (e) => {
           // 处理上传的进度
-          console.log(blockCount, i, e, file);
+          console.log(chunkCount, i, e, chunk);
         }
       };
       // 加入到 Promise 数组中
@@ -96,8 +85,8 @@
       const data = {
         size: file.size,
         name: file.name,
-        total: blockCount,
-        hash
+        total: chunkCount,
+        fileHash
       };
       axios
         .post('/file/merge_chunks', data)
