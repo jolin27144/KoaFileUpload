@@ -62,12 +62,12 @@
       // 构建表单
       const form = new FormData();
       form.append('file', chunk);
-      form.append('name', file.name);
-      form.append('total', chunkCount);
-      form.append('index', i);
-      form.append('size', file.size);
+      // form.append('name', file.name);
+      // form.append('total', chunkCount);
+      // form.append('size', file.size);
       form.append('fileHash', fileHash);
       form.append('chunkHash', chunkHash);
+      form.append('index', i);
       // ajax提交 分片，此时 content-type 为 multipart/form-data
       const axiosOptions = {
         onUploadProgress: (e) => {

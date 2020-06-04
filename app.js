@@ -29,13 +29,13 @@ router.post('/file/upload', upload.single('file'), async (ctx, next) => {
     // 创建hash目录
     await fs.mkdir(chunksPath, { recursive: true });
   }
-  const buffer = fs.readFileSync(ctx.req.file.path);
-  const fsHash = crypto.createHash('md5');
 
-  fsHash.update(buffer);
-  const md5 = fsHash.digest('hex');
-  if (md5 !== chunkHash) {
+  const buffer = fs.readFileSync(ctx.req.file.path);
+  const hash = crypto.createHash('md5').update(buffer).digest('hex');
+  if (hash !== chunkHash) {
     console.log('分片校验失败');
+    ctx.status = 500;
+    ctx.res.end('分片校验失败');
   }
 
   // 分片移动到hash目录
