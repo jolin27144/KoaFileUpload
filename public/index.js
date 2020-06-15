@@ -103,3 +103,8 @@
 
   document.addEventListener('DOMContentLoaded', DOMContentLoadedCB);
 })();
+
+document.querySelector('#dl-btn').addEventListener('click', () => {
+  axios.get('/download');
+  // window.open('/download')
+});

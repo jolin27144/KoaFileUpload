@@ -16,6 +16,21 @@ const app = new Koa();
 
 app.use(koaBody());
 
+router.get('/download', async (ctx, next) => {
+  const file = fs.readFileSync(
+    path.join(
+      __dirname,
+      '/public/顺德区村级工业园区环境质量监控体系项目_标段三__开发计划_内部_20200612PA147.xlsx'
+    )
+  );
+  ctx.type = 'application/octet-stream; charset=utf-8';
+  
+  ctx.attachment('try.xlsx')
+  ctx.status = 200;
+  ctx.res.end(file);
+  // next();
+});
+
 /**
  * single(fieldname)
  * Accept a single file with the name fieldname. The single file will be stored in req.file.
